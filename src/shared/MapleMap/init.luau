@@ -53,7 +53,7 @@ export type MapleMapMetadata = {
     ["Count"]: number,
     ["Capacity"]: number,
     ["IsLocked"]: boolean,
-    ["IsConst"]: boolean,
+    ["IsMutable"]: boolean,
     ["MapleMap"]: true,
     [string]: any
 }
@@ -90,7 +90,7 @@ function MapleMap.New(map: RawMap?, metadata: MapleMapMetadata?)
             Capacity = INFINITE_CAPACITY,
             Count = 0,
             IsLocked = false,
-            IsConst = false,
+            IsMutable = true,
             MapleMap = true
         })
 
@@ -238,15 +238,15 @@ function MapleMap.Lock(self: MapleMapT)
 end
 
 function MapleMap.Unlock(self: MapleMapT)
-    if self._Metadata.IsConst then
-        warn(CommonWarns.ConstMap)
+    if self._Metadata.IsMutable == false then
+        warn(CommonWarns.MutabilityDisabled)
         return
     end
     self._Metadata.IsLocked = false
 end
 
-function MapleMap.MakeConst(self: MapleMapT)
-    self._Metadata.IsConst = true
+function MapleMap.MakeImmutable(self: MapleMapT)
+    self._Metadata.IsMutable = false
 end
 
 function MapleMap.Keys(self: MapleMapT): {string}
