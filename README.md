@@ -3,7 +3,7 @@ Weeping Willow is a utility library for Roblox.
 Existing Modules:
 MapleMap
 
-Planned Modules
+Planned Modules:
 AcaciaArray
 SpruceSet
 TulipTimer
