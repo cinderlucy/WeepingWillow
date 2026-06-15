@@ -82,7 +82,6 @@ local function CountMap(map: RawMap)
     return count
 end
 
-
 local function MapContainsTable(map: RawMap)
     for _, v in map do
         if typeof(v) == "table" then
@@ -318,7 +317,7 @@ function MapleMap.DeepCopy(self: MapleMapT): MapleMapT
     for k, v in self._Metadata do
         deepCopy._Metadata[k] = v
     end
-    
+
     return MapleMap.New(deepCopy._KVs, deepCopy._Metadata.Capacity, deepCopy._Metadata.IsFixedCapacity, deepCopy._Metadata.IsLocked, deepCopy._Metadata.IsMutable)
 end
 
