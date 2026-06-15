@@ -1,6 +1,6 @@
 --[[
-Created by cinderlucy
-Meant for all
+Written by cinderlucy
+Made for all
 ]]
 
 --!strict

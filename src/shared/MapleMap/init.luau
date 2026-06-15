@@ -1,11 +1,12 @@
 --[[
-Created by cinderlucy
-Meant for all
+Written by cinderlucy
+Made for all
 ]]
 
 --!strict
 local Settings = require("./MapleMap/Settings")
 local CommonWarns = require("./MapleMap/CommonWarns")
+local LilacLINQ = require("./LilacLINQ")
 
 export type RawMap = {[string]: any}
 
@@ -58,6 +59,7 @@ end
 export type MapleMapMetadata = {
     ["Count"]: number,
     ["Capacity"]: number,
+    ["IsFixedCapacity"]: boolean,
     ["IsLocked"]: boolean,
     ["IsMutable"]: boolean,
     ["MapleMap"]: true,
@@ -72,6 +74,15 @@ export type MapleMapT = setmetatable<{
 
 local INFINITE_CAPACITY = -1
 
+local function CountMap(map: RawMap)
+    local count = 0
+    for _, _ in map do
+        count += 1
+    end
+    return count
+end
+
+
 local function MapContainsTable(map: RawMap)
     for _, v in map do
         if typeof(v) == "table" then
@@ -81,7 +92,7 @@ local function MapContainsTable(map: RawMap)
     return false
 end
 
-function MapleMap.New(map: RawMap?, metadata: MapleMapMetadata?)
+function MapleMap.New(map: RawMap?, capacity: number?, isFixedCapacity: boolean?, isLocked: boolean?, isMutable: boolean?)
     local self = setmetatable({}, MapleMap) :: MapleMapT
     local mapToUse = map or {}
 
@@ -92,11 +103,12 @@ function MapleMap.New(map: RawMap?, metadata: MapleMapMetadata?)
     end
 
     rawset(self, "_KVs", mapToUse)
-    rawset(self, "_Metadata", if metadata then metadata else {
-            Capacity = INFINITE_CAPACITY,
+    rawset(self, "_Metadata", {
+            Capacity = capacity or INFINITE_CAPACITY,
             Count = 0,
-            IsLocked = false,
-            IsMutable = true,
+            IsFixedCapacity = isFixedCapacity or false,
+            IsLocked = isLocked or false,
+            IsMutable = isMutable or true,
             MapleMap = true
         })
 
@@ -110,6 +122,12 @@ end
 function MapleMap.Add(self: MapleMapT, key: string, value: any)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
+        return false
+    end
+
+    local extraSpaceNeeded = 1
+    if not self:_HasSufficientSpace(extraSpaceNeeded) then
+        warn(`Capacity reached. Can't add any more keys`)
         return false
     end
 
@@ -166,17 +184,77 @@ function MapleMap.Remove(self: MapleMapT, key: string)
     return true
 end
 
+function MapleMap.Expand(self: MapleMapT, by: number)
+    if self:_IsLockedOrImmutable() then
+        warn(CommonWarns.LockedMap)
+        return
+    end
+
+    if self._Metadata.IsFixedCapacity then
+        warn(`Can't expand because map has a fixed capacity`)
+        return
+    end
+    self._Metadata.Capacity += by
+end
+
+function MapleMap.Shrink(self: MapleMapT, by: number)
+    if self:_IsLockedOrImmutable() then
+        warn(CommonWarns.LockedMap)
+        return
+    end
+
+    if self._Metadata.IsFixedCapacity then
+        warn(`Can't shrink because map has a fixed capacity`)
+        return
+    end
+    local difference = self._Metadata.Capacity - by
+    if difference < self._Metadata.Count then
+        warn(`Can't shrink map by {by} because map contains {self._Metadata.Count} element(s)`)
+        return
+    end
+    self._Metadata.Capacity = difference
+end
+
+function MapleMap.TrimExcess(self: MapleMapT)
+    if self:_IsLockedOrImmutable() then
+        warn(CommonWarns.LockedMap)
+        return
+    end
+
+    if self._Metadata.IsFixedCapacity then
+        warn(`Can't trim because map has a fixed capacity`)
+        return
+    end
+    self._Metadata.Capacity = self._Metadata.Count
+end
+
+function MapleMap.Resize(self: MapleMapT, newSize: number)
+    if self:_IsLockedOrImmutable() then
+        warn(CommonWarns.LockedMap)
+        return
+    end
+
+    if self._Metadata.IsFixedCapacity then
+        warn(`Can't resize because map has a fixed capacity`)
+        return
+    end
+
+    if self._Metadata.Count > newSize then
+        warn(`New capacity can not be less than current count of elements`)
+        return
+    end
+
+    self._Metadata.Capacity = newSize
+end
+
 function MapleMap.ContainsKey(self: MapleMapT, key: string)
     return self._KVs[key] ~= nil
 end
 
 function MapleMap.ContainsValue(self: MapleMapT, value: any)
-    for _, v: any in self._KVs do
-        if v == value then
-            return true
-        end
-    end
-    return false
+    return self:Any(function(k, v)
+        return v == value
+    end)
 end
 
 function MapleMap.Clear(self: MapleMapT)
@@ -205,15 +283,20 @@ function MapleMap.Join(self: MapleMapT, other: RawMap | MapleMapT)
         elements = raw
     end
 
-    local elementsJoined = 0
-    for k, v: any in elements do
-        if self._KVs[k] then
-            continue
-        end
-        self._KVs[k] = v
-        elementsJoined += 1
+    local elementsToAdd = LilacLINQ.Where(elements, function(k: string, v: any)
+        return self._KVs[k] == nil
+    end)
+
+    local spaceToAdd = CountMap(elementsToAdd)
+    if not self:_HasSufficientSpace(spaceToAdd) then
+        warn(`Can not join maps together. Insufficient space`)
+        return false
     end
-    self._Metadata.Count += elementsJoined
+
+    for k, v: any in elementsToAdd do
+        self._KVs[k] = v
+    end
+    self._Metadata.Count += spaceToAdd
 
     return true
 end
@@ -235,7 +318,7 @@ function MapleMap.DeepCopy(self: MapleMapT): MapleMapT
     for k, v in self._Metadata do
         deepCopy._Metadata[k] = v
     end
-    return MapleMap.New(deepCopy._KVs, deepCopy._Metadata)
+    return MapleMap.New(deepCopy._KVs, deepCopy._Metadata.Capacity, deepCopy._Metadata.IsFixedCapacity, deepCopy._Metadata.IsLocked, deepCopy._Metadata.IsMutable)
 end
 
 function MapleMap.For(self: MapleMapT, loop: (k: string, v: any) -> ())
@@ -317,47 +400,21 @@ function MapleMap.TrueEquals(self: MapleMapT, other: MapleMapT)
     return DeepEquals(self, other)
 end
 
--- LINQ style methods
-
---[[ Returns true if all k/vs meet the condition ]]
+-- LINQ methods
 function MapleMap.All(self: MapleMapT, condition: (k: string, v: any) -> boolean)
-    for k, v: any in self._KVs do
-        if not condition(k, v) then
-            return false
-        end
-    end
-    return true
+    return LilacLINQ.All(self._KVs, condition)
 end
 
---[[ Returns true if any k/vs meet the condition ]]
 function MapleMap.Any(self: MapleMapT, condition: (k: string, v: any) -> boolean)
-    for k, v: any in self._KVs do
-        if condition(k, v) then
-            return true
-        end
-    end
-    return false
+    return LilacLINQ.Any(self._KVs, condition)
 end
 
---[[ Returns a new dictionary that has k/vs where k/vs under _KVs meet the condition ]]
 function MapleMap.Where(self: MapleMapT, condition: (k: string, v: any) -> boolean)
-    local dictionary: {[string]: any} = {}
-    for key, value: any in self._KVs do
-        if not condition(key, value) then
-            continue
-        end
-        dictionary[key] = value
-    end
-    return dictionary
+    return LilacLINQ.Where(self._KVs, condition)
 end
 
---[[ Returns a modified dictionary that's k/vs are modified based on the method provided ]]
 function MapleMap.Select(self: MapleMapT, method: (k: string, v: any) -> any)
-    local dictionary: {[string]: any} = {}
-    for key, value: any in self._KVs do
-        dictionary[key] = method(key, value)
-    end
-    return dictionary
+    return LilacLINQ.Select(self._KVs, method)
 end
 
 -- Getters
@@ -373,26 +430,22 @@ function MapleMap.IsLocked(self: MapleMapT)
     return self._Metadata.IsLocked
 end
 
-function MapleMap.IsConst(self: MapleMapT)
-    return self._Metadata.IsConst
+function MapleMap.IsMutable(self: MapleMapT)
+    return self._Metadata.IsMutable
 end
 
 -- Private methods
-local function CountMap(map: RawMap)
-    local count = 0
-    for _, _ in map do
-        count += 1
-    end
-    return count
-end
-
 function MapleMap._CountKeys(self: MapleMapT)
     local count = CountMap(self._KVs)
     self._Metadata.Count = count
 end
 
 function MapleMap._IsLockedOrImmutable(self: MapleMapT)
-    return self:IsLocked() or self:IsConst()
+    return self:IsLocked() or not self:IsMutable()
+end
+
+function MapleMap._HasSufficientSpace(self: MapleMapT, space: number)
+    return self._Metadata.Capacity == INFINITE_CAPACITY or self._Metadata.Count + space <= self._Metadata.Capacity
 end
 
 return MapleMap
