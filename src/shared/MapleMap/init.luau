@@ -282,12 +282,11 @@ function MapleMap.Join(self: MapleMapT, other: RawMap | MapleMapT)
         elements = raw
     end
 
-    local elementsToAdd = LilacLINQ.Where(elements, function(k: string, v: any)
+    local elementsToAdd, count = LilacLINQ.Where(elements, function(k: string, v: any)
         return self._KVs[k] == nil
     end)
 
-    local spaceToAdd = CountMap(elementsToAdd)
-    if not self:_HasSufficientSpace(spaceToAdd) then
+    if not self:_HasSufficientSpace(count) then
         warn(`Can not join maps together. Insufficient space`)
         return false
     end
@@ -295,7 +294,7 @@ function MapleMap.Join(self: MapleMapT, other: RawMap | MapleMapT)
     for k, v: any in elementsToAdd do
         self._KVs[k] = v
     end
-    self._Metadata.Count += spaceToAdd
+    self._Metadata.Count += count
 
     return true
 end
