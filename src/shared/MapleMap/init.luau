@@ -108,7 +108,7 @@ function MapleMap.New(map: RawMap?, metadata: MapleMapMetadata?)
 end
 
 function MapleMap.Add(self: MapleMapT, key: string, value: any)
-    if self:_IsLockedOrConst() then
+    if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
     end
@@ -132,7 +132,7 @@ function MapleMap.Get(self: MapleMapT, key: string)
 end
 
 function MapleMap.Set(self: MapleMapT, key: string, value: any)
-    if self:_IsLockedOrConst() then
+    if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
     end
@@ -151,7 +151,7 @@ function MapleMap.Set(self: MapleMapT, key: string, value: any)
 end
 
 function MapleMap.Remove(self: MapleMapT, key: string)
-    if self:_IsLockedOrConst() then
+    if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
     end
@@ -170,8 +170,17 @@ function MapleMap.ContainsKey(self: MapleMapT, key: string)
     return self._KVs[key] ~= nil
 end
 
+function MapleMap.ContainsValue(self: MapleMapT, value: any)
+    for _, v: any in self._KVs do
+        if v == value then
+            return true
+        end
+    end
+    return false
+end
+
 function MapleMap.Clear(self: MapleMapT)
-    if self:_IsLockedOrConst() then
+    if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
     end
@@ -180,8 +189,9 @@ function MapleMap.Clear(self: MapleMapT)
     return true
 end
 
+--[[ Add keys from other into self. Preserves values if self and other have a same key ]]
 function MapleMap.Join(self: MapleMapT, other: RawMap | MapleMapT)
-    if self:_IsLockedOrConst() then
+    if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
     end
@@ -208,10 +218,12 @@ function MapleMap.Join(self: MapleMapT, other: RawMap | MapleMapT)
     return true
 end
 
+--[[ Returns a referenced copy of self(includes _KVs and _Metadata) ]]
 function MapleMap.Copy(self: MapleMapT)
     return table.clone(self)
 end
 
+--[[ Returns a non-referenced copy of self ]]
 function MapleMap.DeepCopy(self: MapleMapT): MapleMapT
     local deepCopy = {} :: MapleMapT
     deepCopy._KVs = {}
@@ -255,6 +267,7 @@ function MapleMap.MakeImmutable(self: MapleMapT)
     self._Metadata.IsMutable = false
 end
 
+--[[ Returns an array of all keys(not a reference table) ]]
 function MapleMap.Keys(self: MapleMapT): {string}
     local keys: {string} = {}
     for k, _ in self._KVs do
@@ -263,21 +276,13 @@ function MapleMap.Keys(self: MapleMapT): {string}
     return keys
 end
 
+--[[ Returns an array of all values(not a reference table) ]]
 function MapleMap.Values(self: MapleMapT): {any}
     local keys: {any} = {}
     for _, v: any in self._KVs do
         table.insert(keys, v)
     end
     return keys
-end
-
-function MapleMap.Equals(self: MapleMapT, other: MapleMapT)
-    for k, v: any in self._KVs do
-        if other._KVs[k] ~= v then
-            return false
-        end
-    end
-    return true
 end
 
 local function DeepEquals(first: RawMap, second: RawMap)
@@ -292,7 +297,29 @@ local function DeepEquals(first: RawMap, second: RawMap)
     return true
 end
 
+--[[ Returns true only if top level _KVs are equal ]]
+function MapleMap.Equals(self: MapleMapT, other: MapleMapT)
+    for k, v: any in self._KVs do
+        if other._KVs[k] ~= v then
+            return false
+        end
+    end
+    return true
+end
+
+--[[ Returns true for deep equality(tables in tables) within _KVs of self and other ]]
+function MapleMap.DeepEquals(self: MapleMapT, other: MapleMapT)
+    return DeepEquals(self._KVs, other._KVs)
+end
+
+--[[ Returns true for deep equality within _KVs and _Metadata of self and other ]]
+function MapleMap.TrueEquals(self: MapleMapT, other: MapleMapT)
+    return DeepEquals(self, other)
+end
+
 -- LINQ style methods
+
+--[[ Returns true if all k/vs meet the condition ]]
 function MapleMap.All(self: MapleMapT, condition: (k: string, v: any) -> boolean)
     for k, v: any in self._KVs do
         if not condition(k, v) then
@@ -302,6 +329,7 @@ function MapleMap.All(self: MapleMapT, condition: (k: string, v: any) -> boolean
     return true
 end
 
+--[[ Returns true if any k/vs meet the condition ]]
 function MapleMap.Any(self: MapleMapT, condition: (k: string, v: any) -> boolean)
     for k, v: any in self._KVs do
         if condition(k, v) then
@@ -311,6 +339,7 @@ function MapleMap.Any(self: MapleMapT, condition: (k: string, v: any) -> boolean
     return false
 end
 
+--[[ Returns a new dictionary that has k/vs where k/vs under _KVs meet the condition ]]
 function MapleMap.Where(self: MapleMapT, condition: (k: string, v: any) -> boolean)
     local dictionary: {[string]: any} = {}
     for key, value: any in self._KVs do
@@ -322,22 +351,13 @@ function MapleMap.Where(self: MapleMapT, condition: (k: string, v: any) -> boole
     return dictionary
 end
 
+--[[ Returns a modified dictionary that's k/vs are modified based on the method provided ]]
 function MapleMap.Select(self: MapleMapT, method: (k: string, v: any) -> any)
     local dictionary: {[string]: any} = {}
     for key, value: any in self._KVs do
         dictionary[key] = method(key, value)
     end
     return dictionary
-end
-
--- Accounts for deep equality within _KVs of self and other
-function MapleMap.DeepEquals(self: MapleMapT, other: MapleMapT)
-    return DeepEquals(self._KVs, other._KVs)
-end
-
--- Accounts for deep equality within _KVs and _Metadata of self and other
-function MapleMap.TrueEquals(self: MapleMapT, other: MapleMapT)
-    return DeepEquals(self, other)
 end
 
 -- Getters
@@ -371,7 +391,7 @@ function MapleMap._CountKeys(self: MapleMapT)
     self._Metadata.Count = count
 end
 
-function MapleMap._IsLockedOrConst(self: MapleMapT)
+function MapleMap._IsLockedOrImmutable(self: MapleMapT)
     return self:IsLocked() or self:IsConst()
 end
 
