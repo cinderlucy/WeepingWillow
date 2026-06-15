@@ -21,6 +21,12 @@ MapleMap.__newindex = function(self: RawMap, key: string, value: any)
         map:Set(key, value)
         return
     end
+
+    if value == nil then
+        map:Remove(key)
+        return
+    end
+
     map:Add(key, value)
 end
 MapleMap.__len = function(self: RawMap)
