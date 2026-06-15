@@ -1,0 +1,18 @@
+{
+  "name": "WeepingWillow",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "WeepingWillow": {
+        "$path": "src/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    }
+  }
+}
