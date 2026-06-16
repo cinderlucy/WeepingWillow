@@ -6,8 +6,9 @@ Made for all
 --!strict
 local LilacLINQ = {}
 
-type ConditionFunc = (k: any, v: any) -> boolean
 type Table = {[any]: any}
+export type ConditionFunc = (k: any, v: any) -> boolean
+export type AnyFunc = (k: any, v: any) -> any
 
 --[[ Returns true if all k/vs meet the condition ]]
 function LilacLINQ.All(tab: Table, condition: ConditionFunc)
@@ -44,13 +45,31 @@ function LilacLINQ.Where(tab: Table, condition: ConditionFunc): (Table, number)
 end
 
 --[[ Returns a modified dictionary that's k/vs are modified based on the method provided ]]
-function LilacLINQ.Select(tab: Table, method: (k: any, v: any) -> any): ({[string]: any}, number)
+function LilacLINQ.Select(tab: Table, method: AnyFunc): (Table, number)
     local dictionary: {[string]: any} = {}
     local count = 0
     for key, value: any in tab do
         dictionary[key] = method(key, value)
+        count += 1
     end
     return dictionary, count
+end
+
+function LilacLINQ.GroupBy(tab: Table, method: AnyFunc): (Table, number)
+    local dictionary: Table = {}
+    local count = 0
+    for k, v in tab do
+        local category = method(k, v)
+        
+        if dictionary[category] == nil then
+            dictionary[category] = {}
+        end
+
+        dictionary[category][k] = v
+
+        count += 1
+    end
+    return dictionary, count 
 end
 
 return LilacLINQ

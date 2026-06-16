@@ -400,20 +400,24 @@ function MapleMap.TrueEquals(self: MapleMapT, other: MapleMapT)
 end
 
 -- LINQ methods
-function MapleMap.All(self: MapleMapT, condition: (k: string, v: any) -> boolean)
+function MapleMap.All(self: MapleMapT, condition: LilacLINQ.ConditionFunc)
     return LilacLINQ.All(self._KVs, condition)
 end
 
-function MapleMap.Any(self: MapleMapT, condition: (k: string, v: any) -> boolean)
+function MapleMap.Any(self: MapleMapT, condition: LilacLINQ.ConditionFunc)
     return LilacLINQ.Any(self._KVs, condition)
 end
 
-function MapleMap.Where(self: MapleMapT, condition: (k: string, v: any) -> boolean)
+function MapleMap.Where(self: MapleMapT, condition: LilacLINQ.ConditionFunc)
     return LilacLINQ.Where(self._KVs, condition)
 end
 
-function MapleMap.Select(self: MapleMapT, method: (k: string, v: any) -> any)
+function MapleMap.Select(self: MapleMapT, method: LilacLINQ.AnyFunc)
     return LilacLINQ.Select(self._KVs, method)
+end
+
+function MapleMap.GroupBy(self: MapleMapT, method: LilacLINQ.AnyFunc)
+    return LilacLINQ.GroupBy(self._KVs, method)
 end
 
 -- Getters
