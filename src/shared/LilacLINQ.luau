@@ -46,7 +46,7 @@ end
 
 --[[ Returns a modified dictionary that's k/vs are modified based on the method provided ]]
 function LilacLINQ.Select(tab: Table, method: AnyFunc): (Table, number)
-    local dictionary: {[string]: any} = {}
+    local dictionary: Table = {}
     local count = 0
     for key, value: any in tab do
         dictionary[key] = method(key, value)

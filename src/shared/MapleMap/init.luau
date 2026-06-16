@@ -8,7 +8,7 @@ local Settings = require("./MapleMap/Settings")
 local CommonWarns = require("./MapleMap/CommonWarns")
 local LilacLINQ = require("./LilacLINQ")
 
-export type RawMap = {[string]: any}
+export type RawMap = {[any]: any}
 
 local MapleMap = {}
 MapleMap.__index = MapleMap
@@ -17,7 +17,7 @@ MapleMap.__newindex = function(self: RawMap, key: string, value: any)
         warn(`Can't add key {key} because map provided is not a MapleMap`)
         return
     end
-    local map = self :: MapleMapT
+    local map = self :: MapleMap
     if map:ContainsKey(key) and Settings.AllowNewIndexToUseSet then
         map:Set(key, value)
         return
@@ -35,7 +35,7 @@ MapleMap.__len = function(self: RawMap)
         warn(`Can't check length of map provided is not a MapleMap`)
         return -1
     end
-    local map = self :: MapleMapT
+    local map = self :: MapleMap
     return map._Metadata.Count
 end
 MapleMap.__eq = function(self: RawMap, other: RawMap)
@@ -44,8 +44,8 @@ MapleMap.__eq = function(self: RawMap, other: RawMap)
         return false
     end
     
-    local map = self :: MapleMapT
-    local otherMap = other :: MapleMapT
+    local map = self :: MapleMap
+    local otherMap = other :: MapleMap
 
     if Settings.DefaultEqualityCheck == "Shallow" then
         return map:Equals(otherMap)
@@ -66,7 +66,7 @@ export type MapleMapMetadata = {
     [string]: any
 }
 
-export type MapleMapT = setmetatable<{
+export type MapleMap = setmetatable<{
     ["_KVs"]: RawMap,
     ["_Metadata"]: MapleMapMetadata,
     [string]: any
@@ -92,7 +92,7 @@ local function MapContainsTable(map: RawMap)
 end
 
 function MapleMap.New(map: RawMap?, capacity: number?, isFixedCapacity: boolean?, isLocked: boolean?, isMutable: boolean?)
-    local self = setmetatable({}, MapleMap) :: MapleMapT
+    local self = setmetatable({}, MapleMap) :: MapleMap
     local mapToUse = map or {}
 
     if map and MapContainsTable(map) then
@@ -118,7 +118,7 @@ function MapleMap.New(map: RawMap?, capacity: number?, isFixedCapacity: boolean?
     return self
 end
 
-function MapleMap.Add(self: MapleMapT, key: string, value: any)
+function MapleMap.Add(self: MapleMap, key: string, value: any)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
@@ -144,11 +144,11 @@ function MapleMap.Add(self: MapleMapT, key: string, value: any)
     return true
 end
 
-function MapleMap.Get(self: MapleMapT, key: string)
+function MapleMap.Get(self: MapleMap, key: string)
     return self._KVs[key]
 end
 
-function MapleMap.Set(self: MapleMapT, key: string, value: any)
+function MapleMap.Set(self: MapleMap, key: string, value: any)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
@@ -167,7 +167,7 @@ function MapleMap.Set(self: MapleMapT, key: string, value: any)
     return true
 end
 
-function MapleMap.Remove(self: MapleMapT, key: string)
+function MapleMap.Remove(self: MapleMap, key: string)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
@@ -183,7 +183,7 @@ function MapleMap.Remove(self: MapleMapT, key: string)
     return true
 end
 
-function MapleMap.Expand(self: MapleMapT, by: number)
+function MapleMap.Expand(self: MapleMap, by: number)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return
@@ -196,7 +196,7 @@ function MapleMap.Expand(self: MapleMapT, by: number)
     self._Metadata.Capacity += by
 end
 
-function MapleMap.Shrink(self: MapleMapT, by: number)
+function MapleMap.Shrink(self: MapleMap, by: number)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return
@@ -214,7 +214,7 @@ function MapleMap.Shrink(self: MapleMapT, by: number)
     self._Metadata.Capacity = difference
 end
 
-function MapleMap.TrimExcess(self: MapleMapT)
+function MapleMap.TrimExcess(self: MapleMap)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return
@@ -227,7 +227,7 @@ function MapleMap.TrimExcess(self: MapleMapT)
     self._Metadata.Capacity = self._Metadata.Count
 end
 
-function MapleMap.Resize(self: MapleMapT, newSize: number)
+function MapleMap.Resize(self: MapleMap, newSize: number)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return
@@ -246,17 +246,17 @@ function MapleMap.Resize(self: MapleMapT, newSize: number)
     self._Metadata.Capacity = newSize
 end
 
-function MapleMap.ContainsKey(self: MapleMapT, key: string)
+function MapleMap.ContainsKey(self: MapleMap, key: string)
     return self._KVs[key] ~= nil
 end
 
-function MapleMap.ContainsValue(self: MapleMapT, value: any)
+function MapleMap.ContainsValue(self: MapleMap, value: any)
     return self:Any(function(k, v)
         return v == value
     end)
 end
 
-function MapleMap.Clear(self: MapleMapT)
+function MapleMap.Clear(self: MapleMap)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
@@ -267,7 +267,7 @@ function MapleMap.Clear(self: MapleMapT)
 end
 
 --[[ Add keys from other into self. Preserves values if self and other have a same key ]]
-function MapleMap.Join(self: MapleMapT, other: RawMap | MapleMapT)
+function MapleMap.Join(self: MapleMap, other: RawMap | MapleMap)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
         return false
@@ -275,7 +275,7 @@ function MapleMap.Join(self: MapleMapT, other: RawMap | MapleMapT)
 
     local elements: RawMap = {}
     if MapleMap.IsMaple(other) then
-        local other2 = other :: MapleMapT
+        local other2 = other :: MapleMap
         elements = other2._KVs
     else
         local raw = other :: RawMap
@@ -300,13 +300,13 @@ function MapleMap.Join(self: MapleMapT, other: RawMap | MapleMapT)
 end
 
 --[[ Returns a referenced copy of self(includes _KVs and _Metadata) ]]
-function MapleMap.Copy(self: MapleMapT)
+function MapleMap.Copy(self: MapleMap)
     return table.clone(self)
 end
 
 --[[ Returns a non-referenced copy of self ]]
-function MapleMap.DeepCopy(self: MapleMapT): MapleMapT
-    local deepCopy = {} :: MapleMapT
+function MapleMap.DeepCopy(self: MapleMap): MapleMap
+    local deepCopy = {} :: MapleMap
     deepCopy._KVs = {}
     deepCopy._Metadata = {} :: MapleMapMetadata
 
@@ -320,7 +320,7 @@ function MapleMap.DeepCopy(self: MapleMapT): MapleMapT
     return MapleMap.New(deepCopy._KVs, deepCopy._Metadata.Capacity, deepCopy._Metadata.IsFixedCapacity, deepCopy._Metadata.IsLocked, deepCopy._Metadata.IsMutable)
 end
 
-function MapleMap.For(self: MapleMapT, loop: (k: string, v: any) -> ())
+function MapleMap.For(self: MapleMap, loop: (k: string, v: any) -> ())
     for k, v: any in self._KVs do
         loop(k, v)    
     end
@@ -333,11 +333,11 @@ function MapleMap.IsMaple(map: RawMap)
     return map["_Metadata"]["MapleMap"] == true
 end
 
-function MapleMap.Lock(self: MapleMapT)
+function MapleMap.Lock(self: MapleMap)
     self._Metadata.IsLocked = true
 end
 
-function MapleMap.Unlock(self: MapleMapT)
+function MapleMap.Unlock(self: MapleMap)
     if self._Metadata.IsMutable == false then
         warn(CommonWarns.MutabilityDisabled)
         return
@@ -345,12 +345,12 @@ function MapleMap.Unlock(self: MapleMapT)
     self._Metadata.IsLocked = false
 end
 
-function MapleMap.MakeImmutable(self: MapleMapT)
+function MapleMap.MakeImmutable(self: MapleMap)
     self._Metadata.IsMutable = false
 end
 
 --[[ Returns an array of all keys(not a reference table) ]]
-function MapleMap.Keys(self: MapleMapT): {string}
+function MapleMap.Keys(self: MapleMap): {string}
     local keys: {string} = {}
     for k, _ in self._KVs do
         table.insert(keys, k)
@@ -359,7 +359,7 @@ function MapleMap.Keys(self: MapleMapT): {string}
 end
 
 --[[ Returns an array of all values(not a reference table) ]]
-function MapleMap.Values(self: MapleMapT): {any}
+function MapleMap.Values(self: MapleMap): {any}
     local keys: {any} = {}
     for _, v: any in self._KVs do
         table.insert(keys, v)
@@ -380,7 +380,7 @@ local function DeepEquals(first: RawMap, second: RawMap)
 end
 
 --[[ Returns true only if top level _KVs are equal ]]
-function MapleMap.Equals(self: MapleMapT, other: MapleMapT)
+function MapleMap.Equals(self: MapleMap, other: MapleMap)
     for k, v: any in self._KVs do
         if other._KVs[k] ~= v then
             return false
@@ -390,64 +390,64 @@ function MapleMap.Equals(self: MapleMapT, other: MapleMapT)
 end
 
 --[[ Returns true for deep equality(tables in tables) within _KVs of self and other ]]
-function MapleMap.DeepEquals(self: MapleMapT, other: MapleMapT)
+function MapleMap.DeepEquals(self: MapleMap, other: MapleMap)
     return DeepEquals(self._KVs, other._KVs)
 end
 
 --[[ Returns true for deep equality within _KVs and _Metadata of self and other ]]
-function MapleMap.TrueEquals(self: MapleMapT, other: MapleMapT)
+function MapleMap.TrueEquals(self: MapleMap, other: MapleMap)
     return DeepEquals(self, other)
 end
 
 -- LINQ methods
-function MapleMap.All(self: MapleMapT, condition: LilacLINQ.ConditionFunc)
+function MapleMap.All(self: MapleMap, condition: LilacLINQ.ConditionFunc)
     return LilacLINQ.All(self._KVs, condition)
 end
 
-function MapleMap.Any(self: MapleMapT, condition: LilacLINQ.ConditionFunc)
+function MapleMap.Any(self: MapleMap, condition: LilacLINQ.ConditionFunc)
     return LilacLINQ.Any(self._KVs, condition)
 end
 
-function MapleMap.Where(self: MapleMapT, condition: LilacLINQ.ConditionFunc)
+function MapleMap.Where(self: MapleMap, condition: LilacLINQ.ConditionFunc)
     return LilacLINQ.Where(self._KVs, condition)
 end
 
-function MapleMap.Select(self: MapleMapT, method: LilacLINQ.AnyFunc)
+function MapleMap.Select(self: MapleMap, method: LilacLINQ.AnyFunc)
     return LilacLINQ.Select(self._KVs, method)
 end
 
-function MapleMap.GroupBy(self: MapleMapT, method: LilacLINQ.AnyFunc)
+function MapleMap.GroupBy(self: MapleMap, method: LilacLINQ.AnyFunc)
     return LilacLINQ.GroupBy(self._KVs, method)
 end
 
 -- Getters
-function MapleMap.Count(self: MapleMapT)
+function MapleMap.Count(self: MapleMap)
     return self._Metadata.Count
 end
 
-function MapleMap.Capacity(self: MapleMapT)
+function MapleMap.Capacity(self: MapleMap)
     return self._Metadata.Capacity
 end
 
-function MapleMap.IsLocked(self: MapleMapT)
+function MapleMap.IsLocked(self: MapleMap)
     return self._Metadata.IsLocked
 end
 
-function MapleMap.IsMutable(self: MapleMapT)
+function MapleMap.IsMutable(self: MapleMap)
     return self._Metadata.IsMutable
 end
 
 -- Private methods
-function MapleMap._CountKeys(self: MapleMapT)
+function MapleMap._CountKeys(self: MapleMap)
     local count = CountMap(self._KVs)
     self._Metadata.Count = count
 end
 
-function MapleMap._IsLockedOrImmutable(self: MapleMapT)
+function MapleMap._IsLockedOrImmutable(self: MapleMap)
     return self:IsLocked() or not self:IsMutable()
 end
 
-function MapleMap._HasSufficientSpace(self: MapleMapT, space: number)
+function MapleMap._HasSufficientSpace(self: MapleMap, space: number)
     return self._Metadata.Capacity == INFINITE_CAPACITY or self._Metadata.Count + space <= self._Metadata.Capacity
 end
 
