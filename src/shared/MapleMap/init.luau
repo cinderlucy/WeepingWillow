@@ -347,6 +347,8 @@ end
 
 function MapleMap.MakeImmutable(self: MapleMap)
     self._Metadata.IsMutable = false
+    table.freeze(self._KVs)
+    table.freeze(self._Metadata)
 end
 
 --[[ Returns an array of all keys(not a reference table) ]]
