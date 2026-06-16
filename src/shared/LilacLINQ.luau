@@ -60,13 +60,10 @@ function LilacLINQ.GroupBy(tab: Table, method: AnyFunc): (Table, number)
     local count = 0
     for k, v in tab do
         local category = method(k, v)
-        
         if dictionary[category] == nil then
             dictionary[category] = {}
         end
-
         dictionary[category][k] = v
-
         count += 1
     end
     return dictionary, count 
