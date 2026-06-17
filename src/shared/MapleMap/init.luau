@@ -94,17 +94,26 @@ end
 function MapleMap.New(map: RawMap?, capacity: number?, isFixedCapacity: boolean?, isLocked: boolean?, isMutable: boolean?)
     local self = setmetatable({}, MapleMap) :: MapleMap
     local mapToUse = map or {}
+    local count = 0
 
-    if map and MapContainsTable(map) then
-        mapToUse = {}
-        warn(CommonWarns.TableNotAllowed)
-        warn("Not using map argument for _KVs. Defaulting to empty dictionary")
+    if map then
+        if MapContainsTable(map) then
+            mapToUse = {}
+            warn(CommonWarns.TableNotAllowed)
+            warn("Not using map argument for _KVs. Defaulting to empty dictionary")
+        end
+
+        count = CountMap(map)
+        if capacity and capacity < count and Settings.UNDEF_FallbackToInfinityIfCapacityLessThanCount then
+            warn(`Capacity can't be set to {capacity} because your map has {count} k/v pairs. Setting capacity to infinity instead`)
+            capacity = INFINITE_CAPACITY
+        end
     end
 
     rawset(self, "_KVs", mapToUse)
     rawset(self, "_Metadata", {
             Capacity = capacity or INFINITE_CAPACITY,
-            Count = 0,
+            Count = count,
             IsFixedCapacity = isFixedCapacity or false,
             IsLocked = isLocked or false,
             IsMutable = isMutable or true,
