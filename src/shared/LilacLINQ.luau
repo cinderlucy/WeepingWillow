@@ -30,26 +30,35 @@ function LilacLINQ.Any(tab: Table, condition: ConditionFunc)
     return false
 end
 
---[[ Returns a new dictionary that has k/vs where k/vs under _KVs meet the condition ]]
-function LilacLINQ.Where(tab: Table, condition: ConditionFunc): (Table, number)
+--[[ Returns a new table that has k/vs where k/vs under _KVs meet the condition ]]
+function LilacLINQ.Where(tab: Table, condition: ConditionFunc, isDictionary: boolean?): (Table, number)
     local dictionary: Table = {}
     local count = 0
     for key, value in tab do
         if not condition(key, value) then
             continue
         end
-        dictionary[key] = value
+        if not isDictionary then
+            table.insert(dictionary, value)
+        else
+            dictionary[key] = value
+        end
         count += 1
     end
     return dictionary, count
 end
 
---[[ Returns a modified dictionary that's k/vs are modified based on the method provided ]]
-function LilacLINQ.Select(tab: Table, method: AnyFunc): (Table, number)
+--[[ Returns a modified table that's k/vs are modified based on the method provided ]]
+function LilacLINQ.Select(tab: Table, method: AnyFunc, isDictionary: boolean?): (Table, number)
     local dictionary: Table = {}
     local count = 0
     for key, value: any in tab do
-        dictionary[key] = method(key, value)
+        local result = method(key, value)
+        if not isDictionary then
+            table.insert(dictionary, result)
+        else
+            dictionary[key] = result
+        end
         count += 1
     end
     return dictionary, count
@@ -66,7 +75,13 @@ function LilacLINQ.GroupBy(tab: Table, method: AnyFunc): (Table, number)
         dictionary[category][k] = v
         count += 1
     end
-    return dictionary, count 
+    return dictionary, count
+end
+
+function LilacLINQ.Contains(tab: Table, value: any)
+    return LilacLINQ.Any(tab, function(_, v): boolean
+        return v == value
+    end)
 end
 
 return LilacLINQ

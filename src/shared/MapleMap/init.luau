@@ -4,8 +4,8 @@ Made for all
 ]]
 
 --!strict
-local Settings = require("./MapleMap/Settings")
-local CommonWarns = require("./MapleMap/CommonWarns")
+local Settings = require("@self/Settings")
+local CommonWarns = require("@self/CommonWarns")
 local LilacLINQ = require("./LilacLINQ")
 
 export type RawMap = {[any]: any}
@@ -255,16 +255,6 @@ function MapleMap.Resize(self: MapleMap, newSize: number)
     self._Metadata.Capacity = newSize
 end
 
-function MapleMap.ContainsKey(self: MapleMap, key: string)
-    return self._KVs[key] ~= nil
-end
-
-function MapleMap.ContainsValue(self: MapleMap, value: any)
-    return self:Any(function(k, v)
-        return v == value
-    end)
-end
-
 function MapleMap.Clear(self: MapleMap)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.LockedMap)
@@ -420,15 +410,23 @@ function MapleMap.Any(self: MapleMap, condition: LilacLINQ.ConditionFunc)
 end
 
 function MapleMap.Where(self: MapleMap, condition: LilacLINQ.ConditionFunc)
-    return LilacLINQ.Where(self._KVs, condition)
+    return LilacLINQ.Where(self._KVs, condition, true)
 end
 
 function MapleMap.Select(self: MapleMap, method: LilacLINQ.AnyFunc)
-    return LilacLINQ.Select(self._KVs, method)
+    return LilacLINQ.Select(self._KVs, method, true)
 end
 
 function MapleMap.GroupBy(self: MapleMap, method: LilacLINQ.AnyFunc)
     return LilacLINQ.GroupBy(self._KVs, method)
+end
+
+function MapleMap.ContainsKey(self: MapleMap, key: string)
+    return self._KVs[key] ~= nil
+end
+
+function MapleMap.Contains(self: MapleMap, value: any)
+    return LilacLINQ.Contains(self._KVs, value)
 end
 
 -- Getters
