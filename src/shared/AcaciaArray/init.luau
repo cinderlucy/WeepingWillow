@@ -5,12 +5,34 @@ Made for all
 
 --!strict
 local CommonWarns = require("@self/CommonWarns")
+local Settings = require("@self/Settings")
 local LilacLINQ = require("./LilacLINQ")
 
 export type RawArray<T> = {T}
 
 local AcaciaArray = {}
 AcaciaArray.__index = AcaciaArray
+AcaciaArray.__newindex = function<T>(self: {[string]: any}, index: number, element: any?)
+    if typeof(index) ~= "number" then
+        warn(`Index has to be a number`)
+        return
+    end
+    if not AcaciaArray.IsAcacia(self) then
+        return
+    end
+
+    local array = self :: AcaciaArray<T>
+    if array:ContainsIndex(index) then
+        if element ~= nil and Settings.AllowNewIndexToUseSet then
+            array:Set(index, element) 
+        elseif element == nil and Settings.AllowNewIndexToUseRemove then
+            array:Remove(index)
+        end
+        return
+    end
+
+    array:Add(element)
+end
 AcaciaArray.__len = function<T>(self: {[string]: any})
     if not AcaciaArray.IsAcacia(self) then
         return 0
@@ -28,21 +50,22 @@ export type AcaciaArrayMetadata = {
 }
 export type AcaciaArray<T> = setmetatable<{
     ["_Array"]: RawArray<T>,
-    ["_Metadata"]: AcaciaArrayMetadata
+    ["_Metadata"]: AcaciaArrayMetadata,
+    [string | number]: any -- Union with string and number is important to allow adding new indexes like Array[1] = 1
 }, typeof(AcaciaArray)>
 
 local INFINITE_CAPACITY = -1
 
 function AcaciaArray.New<T>(array: {T}?, capacity: number?, isFixedCapacity: boolean?, isLocked: boolean?, isMutable: boolean?): AcaciaArray<T>
     local self = setmetatable({}, AcaciaArray) :: AcaciaArray<T>
-    self._Array = array or {}
-    self._Metadata = {
+    rawset(self, "_Array", array or {})
+    rawset(self, "_Metadata", {
         Capacity = capacity or INFINITE_CAPACITY,
         IsFixedCapacity = isFixedCapacity or false,
         IsAcacia = true,
         IsLocked = isLocked or false,
-        IsMutable = isMutable or false
-    }
+        IsMutable = isMutable or true
+    })
     return self
 end
 
@@ -67,22 +90,22 @@ function AcaciaArray.Set<T>(self: AcaciaArray<T>, index: number, element: T)
         return false
     end
 
-    if not self:_HasSufficientSpace(1) then
-        warn(CommonWarns.InsufficientSpace)
+    if not self:ContainsIndex(index) then
+        warn(`Create index {index} before attempting to set it`)
         return false
     end
 
-    table.insert(self._Array, element)
+    self._Array[index] = element
     return true
 end
 
-function AcaciaArray.Remove<T>(self: AcaciaArray<T>, element: T)
+function AcaciaArray.Remove<T>(self: AcaciaArray<T>, index: number?)
     if self:_IsLockedOrImmutable() then
         warn(CommonWarns.ImmutableOrLockedArray)
         return false
     end
 
-    table.remove(self._Array, element)
+    table.remove(self._Array, index)
     return true
 end
 
@@ -105,6 +128,10 @@ end
 
 function AcaciaArray.GroupBy<T>(self: AcaciaArray<T>, method: LilacLINQ.AnyFunc)
     return LilacLINQ.GroupBy(self._Array, method)
+end
+
+function AcaciaArray.ContainsIndex<T>(self: AcaciaArray<T>, index: number)
+    return self._Array[index] ~= nil
 end
 
 function AcaciaArray.Contains<T>(self: AcaciaArray<T>, element: T)
