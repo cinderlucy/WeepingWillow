@@ -1,19 +1,143 @@
+--[[
+Written by cinderlucy
+Made for all
+]]
+
 --!strict
+local CommonWarns = require("@self/CommonWarns")
+local LilacLINQ = require("./LilacLINQ")
+
+export type RawArray<T> = {T}
+
 local AcaciaArray = {}
 AcaciaArray.__index = AcaciaArray
+AcaciaArray.__len = function<T>(self: {[string]: any})
+    if not AcaciaArray.IsAcacia(self) then
+        return 0
+    end
+    local array = self :: AcaciaArray<T>
+    return array:Count()
+end
 
-export type RawArray = {[number]: any}
-type AcaciaArrayMetadata = {
+export type AcaciaArrayMetadata = {
+    ["Capacity"]: number,
+    ["IsFixedCapacity"]: boolean,
+    ["IsAcacia"]: boolean,
     ["IsLocked"]: boolean,
     ["IsMutable"]: boolean
 }
-export type AcaciaArray = setmetatable<{
-    ["_Array"]: RawArray,
+export type AcaciaArray<T> = setmetatable<{
+    ["_Array"]: RawArray<T>,
     ["_Metadata"]: AcaciaArrayMetadata
 }, typeof(AcaciaArray)>
 
-function AcaciaArray.New()
-    
+local INFINITE_CAPACITY = -1
+
+function AcaciaArray.New<T>(array: {T}?, capacity: number?, isFixedCapacity: boolean?, isLocked: boolean?, isMutable: boolean?): AcaciaArray<T>
+    local self = setmetatable({}, AcaciaArray) :: AcaciaArray<T>
+    self._Array = array or {}
+    self._Metadata = {
+        Capacity = capacity or INFINITE_CAPACITY,
+        IsFixedCapacity = isFixedCapacity or false,
+        IsAcacia = true,
+        IsLocked = isLocked or false,
+        IsMutable = isMutable or false
+    }
+    return self
+end
+
+function AcaciaArray.Add<T>(self: AcaciaArray<T>, element: T)
+    if self:_IsLockedOrImmutable() then
+        warn(CommonWarns.ImmutableOrLockedArray)
+        return false
+    end
+
+    if not self:_HasSufficientSpace(1) then
+        warn(CommonWarns.InsufficientSpace)
+        return false
+    end
+
+    table.insert(self._Array, element)
+    return true
+end
+
+function AcaciaArray.Set<T>(self: AcaciaArray<T>, index: number, element: T)
+    if self:_IsLockedOrImmutable() then
+        warn(CommonWarns.ImmutableOrLockedArray)
+        return false
+    end
+
+    if not self:_HasSufficientSpace(1) then
+        warn(CommonWarns.InsufficientSpace)
+        return false
+    end
+
+    table.insert(self._Array, element)
+    return true
+end
+
+function AcaciaArray.Remove<T>(self: AcaciaArray<T>, element: T)
+    if self:_IsLockedOrImmutable() then
+        warn(CommonWarns.ImmutableOrLockedArray)
+        return false
+    end
+
+    table.remove(self._Array, element)
+    return true
+end
+
+-- LINQ Methods
+function AcaciaArray.All<T>(self: AcaciaArray<T>, condition: LilacLINQ.ConditionFunc)
+    return LilacLINQ.All(self._Array, condition)
+end
+
+function AcaciaArray.Any<T>(self: AcaciaArray<T>, condition: LilacLINQ.ConditionFunc)
+    return LilacLINQ.Any(self._Array, condition)
+end
+
+function AcaciaArray.Where<T>(self: AcaciaArray<T>, condition: LilacLINQ.ConditionFunc)
+    return LilacLINQ.Where(self._Array, condition)
+end
+
+function AcaciaArray.Select<T>(self: AcaciaArray<T>, method: LilacLINQ.AnyFunc)
+    return LilacLINQ.Select(self._Array, method)
+end
+
+function AcaciaArray.GroupBy<T>(self: AcaciaArray<T>, method: LilacLINQ.AnyFunc)
+    return LilacLINQ.GroupBy(self._Array, method)
+end
+
+function AcaciaArray.Contains<T>(self: AcaciaArray<T>, element: T)
+    return LilacLINQ.Contains(self._Array, element)
+end
+
+-- Getters
+function AcaciaArray.IsLocked<T>(self: AcaciaArray<T>)
+    return self._Metadata.IsLocked
+end
+
+function AcaciaArray.IsMutable<T>(self: AcaciaArray<T>)
+    return self._Metadata.IsMutable
+end
+
+function AcaciaArray.IsAcacia(raw: {[string]: any})
+    if raw["_Metadata"] == nil then
+        return false
+    end
+    return raw["_Metadata"]["IsAcacia"] == true
+end
+
+function AcaciaArray.Count<T>(self: AcaciaArray<T>)
+    return #self._Array
+end
+
+-- Private methods
+function AcaciaArray._IsLockedOrImmutable<T>(self: AcaciaArray<T>)
+    return self._Metadata.IsLocked or not self._Metadata.IsMutable
+end
+
+function AcaciaArray._HasSufficientSpace<T>(self: AcaciaArray<T>, spaceNeeded: number)
+    return self._Metadata.Capacity == INFINITE_CAPACITY or self._Metadata.Capacity > self:Count() + spaceNeeded
 end
 
 return AcaciaArray
