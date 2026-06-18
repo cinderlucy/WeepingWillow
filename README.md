@@ -6,6 +6,8 @@ Existing Modules:
 
 Currently Working On:
 - AcaciaArray. An array class with support for locking and mutability, and LINQ methods
+- LilacLINQ
+- MapleMap
 
 Planned Modules:
 - AcaciaArray
