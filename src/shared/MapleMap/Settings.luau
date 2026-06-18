@@ -9,11 +9,14 @@ Some settings can result in undefined behavior. These setting will be marked wit
 
 --!strict
 type EqualityLevels = "Shallow" | "Deep" | "True"
+type HashtagOperatorReturnType = "Root" | "All"
 
 local Settings = {
     AllowNewIndexToUseSet = true,
     AllowNewIndexToUseRemove = true,
     DefaultEqualityCheck = "Shallow" :: EqualityLevels,
+    MaxEqualityNestingCheck = 3, -- Set to -1 for the truest level of equality at the cost of performance on larger maps,
+    HashtagOperatorReturnType = "Root" :: HashtagOperatorReturnType,
     UNDEF_FallbackToInfinityIfCapacityLessThanCount = true
 }
 table.freeze(Settings)
