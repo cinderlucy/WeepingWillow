@@ -18,13 +18,12 @@ MapleMap.__newindex = function(self: RawMap, key: string, value: any)
         return
     end
     local map = self :: MapleMap
-    if map:ContainsKey(key) and Settings.AllowNewIndexToUseSet then
-        map:Set(key, value)
-        return
-    end
-
-    if value == nil then
-        map:Remove(key)
+    if map:ContainsKey(key) then
+        if value ~= nil and Settings.AllowNewIndexToUseSet then
+            map:Set(key, value)
+        elseif value == nil and Settings.AllowNewIndexToUseRemove then
+            map:Remove(key)
+        end
         return
     end
 
@@ -115,14 +114,10 @@ function MapleMap.New(map: RawMap?, capacity: number?, isFixedCapacity: boolean?
             Capacity = capacity or INFINITE_CAPACITY,
             Count = count,
             IsFixedCapacity = isFixedCapacity or false,
-            IsLocked = isLocked or false,
-            IsMutable = isMutable or true,
+            IsLocked = if isLocked ~= nil then isLocked else false,
+            IsMutable = if isMutable ~= nil then isMutable else true,
             MapleMap = true
         })
-
-    if map ~= nil then
-        self:_CountKeys()
-    end
 
     return self
 end
@@ -321,23 +316,27 @@ end
 
 function MapleMap.For(self: MapleMap, loop: (k: string, v: any) -> ())
     for k, v: any in self._KVs do
-        loop(k, v)    
+        loop(k, v)
     end
 end
 
 function MapleMap.IsMaple(map: RawMap)
-    if map["_Metadata"] == nil then
+    if not map["_Metadata"] then
         return false
     end
     return map["_Metadata"]["MapleMap"] == true
 end
 
 function MapleMap.Lock(self: MapleMap)
+    if not self._Metadata.IsMutable then
+        warn(CommonWarns.MutabilityDisabled)
+        return
+    end
     self._Metadata.IsLocked = true
 end
 
 function MapleMap.Unlock(self: MapleMap)
-    if self._Metadata.IsMutable == false then
+    if not self._Metadata.IsMutable then
         warn(CommonWarns.MutabilityDisabled)
         return
     end
@@ -370,11 +369,16 @@ end
 
 local function DeepEquals(first: RawMap, second: RawMap)
     for k, v: any in first do
+        if typeof(v) == "table" and typeof(second[k]) == "table" then
+            local result = DeepEquals(v :: RawMap, second[k] :: RawMap)
+            if result == false then
+                return false
+            end
+            continue -- Skip because the next value check will return false if the tables don't have the same memory address
+        end
+
         if second[k] ~= v then
             return false
-        end
-        if typeof(v) == "table" and typeof(second[k]) == "table" then
-            return DeepEquals(v :: RawMap, second[k] :: RawMap)
         end
     end
     return true
@@ -382,6 +386,10 @@ end
 
 --[[ Returns true only if top level _KVs are equal ]]
 function MapleMap.Equals(self: MapleMap, other: MapleMap)
+    if other:Count() ~= self:Count() then
+        return false
+    end
+
     for k, v: any in self._KVs do
         if other._KVs[k] ~= v then
             return false
@@ -392,11 +400,17 @@ end
 
 --[[ Returns true for deep equality(tables in tables) within _KVs of self and other ]]
 function MapleMap.DeepEquals(self: MapleMap, other: MapleMap)
+    if other:Count() ~= self:Count() then
+        return false
+    end
     return DeepEquals(self._KVs, other._KVs)
 end
 
 --[[ Returns true for deep equality within _KVs and _Metadata of self and other ]]
 function MapleMap.TrueEquals(self: MapleMap, other: MapleMap)
+    if other:Count() ~= self:Count() then
+        return false
+    end
     return DeepEquals(self, other)
 end
 

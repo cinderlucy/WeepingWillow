@@ -12,6 +12,7 @@ type EqualityLevels = "Shallow" | "Deep" | "True"
 
 local Settings = {
     AllowNewIndexToUseSet = true,
+    AllowNewIndexToUseRemove = true,
     DefaultEqualityCheck = "Shallow" :: EqualityLevels,
     UNDEF_FallbackToInfinityIfCapacityLessThanCount = true
 }
