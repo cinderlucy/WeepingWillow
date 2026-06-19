@@ -9,6 +9,14 @@ local LilacLINQ = {}
 type Table = {[any]: any}
 export type ConditionFunc = (k: any, v: any) -> boolean
 export type AnyFunc = (k: any, v: any) -> any
+export type LINQCompatible<T> = {
+    ["All"]: (tab: T, condition: ConditionFunc) -> boolean,
+    ["Any"]: (tab: T, condition: ConditionFunc) -> boolean,
+    ["Where"]: (tab: T, condition: ConditionFunc, isDictionary: boolean?) -> (Table, number),
+    ["Select"]: (tab: T, method: AnyFunc, isDictionary: boolean?) -> (Table, number),
+    ["GroupBy"]: (tab: T, method: AnyFunc) -> (Table, number),
+    ["Contains"]: (tab: T, value: any) -> boolean,
+}
 
 --[[ Returns true if all k/vs meet the condition ]]
 function LilacLINQ.All(tab: Table, condition: ConditionFunc)
