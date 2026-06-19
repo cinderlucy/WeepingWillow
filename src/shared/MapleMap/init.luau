@@ -36,7 +36,7 @@ MapleMap.__len = function<K, V>(self: RawMap)
         return -1
     end
     local map = self :: MapleMap<K, V>
-    return map._Metadata.Count
+    return map:Count()
 end
 MapleMap.__eq = function<K, V>(self: RawMap, other: RawMap)
     if not MapleMap.IsMaple(self) or not MapleMap.IsMaple(other) then
@@ -58,7 +58,6 @@ end
 
 export type MapleMapMetadata<K, V> = {
     ["Count"]: number,
-    ["RootCount"]: number,
     ["Capacity"]: number,
     ["IsFixedCapacity"]: boolean,
     ["IsLocked"]: boolean,
@@ -67,12 +66,7 @@ export type MapleMapMetadata<K, V> = {
     [string]: number | boolean
 }
 
-export type MapleMap<K, V> = setmetatable<{
-    ["_KVs"]: _KVs<K, V>,
-    ["_Metadata"]: MapleMapMetadata<K, V>,
-
-    -- Methods
-    -- Why doesn't Luau typecheck on object method calls with generics??
+type MapleMapMethods<K, V> = {
     ["Add"]: (self: MapleMap<K, V>, key: K, value: V) -> boolean,
     ["Get"]: (self: MapleMap<K, V>, key: K) -> V?,
     ["Set"]: (self: MapleMap<K, V>, key: K, value: V) -> boolean,
@@ -84,13 +78,17 @@ export type MapleMap<K, V> = setmetatable<{
     ["Values"]: (self: MapleMap<K, V>) -> {V},
     ["ContainsKey"]: (self: MapleMap<K, V>, key: K) -> boolean,
     ["Contains"]: (self: MapleMap<K, V>, value: V) -> boolean,
+}
 
-    [string | K]: any
-} & LilacLINQ.LINQCompatible<MapleMap<K, V>>, typeof(MapleMap)>
+export type MapleMap<K, V> = setmetatable<{
+    ["_KVs"]: _KVs<K, V>,
+    ["_Metadata"]: MapleMapMetadata<K, V>,
+    [string]: any -- Limiting to string to not strain the type checker
+} & LilacLINQ.LINQCompatible<MapleMap<K, V>> & MapleMapMethods<K, V>, typeof(MapleMap)>
 
 local INFINITE_CAPACITY = -1
 
-local function CountMap(map: RawMap)
+local function GetCount(map: RawMap)
     local count = 0
     for _, _ in map do
         count += 1
@@ -98,13 +96,26 @@ local function CountMap(map: RawMap)
     return count
 end
 
-local function MapContainsTable(map: RawMap)
-    for _, v in map do
-        if typeof(v) == "table" then
-            return true
-        end
+local function GetTable<K, V>(kvs: _KVs<K, V>): _KVs<K, V>
+    if Settings.NestedTablesAreReferences then
+        return kvs
     end
-    return false
+
+    local copied: _KVs<K, V> = {}
+    local loop: (RawMap) -> RawMap
+    loop = function(tab: RawMap)
+        local new: RawMap = {}
+        for k: any, v: any in tab do
+            if typeof(v) == "table" then
+                new[k] = loop(v :: RawMap)
+                continue
+            end
+            new[k] = v
+        end
+        return new
+    end
+    copied = loop(kvs)
+    return copied
 end
 
 function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacity: boolean?, isLocked: boolean?, isMutable: boolean?): MapleMap<K, V>
@@ -113,13 +124,7 @@ function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacit
     local count = 0
 
     if _kvs then
-        if MapContainsTable(_kvs) then
-            mapToUse = {}
-            warn(CommonWarns.TableNotAllowed)
-            warn("Not using map argument for _KVs. Defaulting to empty dictionary")
-        end
-
-        count = CountMap(_kvs)
+        count = GetCount(_kvs)
         if capacity and capacity < count and Settings.UNDEF_FallbackToInfinityIfCapacityLessThanCount then
             warn(`Capacity can't be set to {capacity} because your map has {count} k/v pairs. Setting capacity to infinity instead`)
             capacity = INFINITE_CAPACITY
@@ -145,12 +150,14 @@ function MapleMap.Add<K, V>(self: MapleMap<K, V>, key: K, value: V)
         return false
     end
 
-    
-
-    local extraSpaceNeeded = 1
-    if not self:_HasSufficientSpace(extraSpaceNeeded) then
+    local spaceNeeded = 1
+    if not self:_HasSufficientSpace(spaceNeeded) then
         warn(`Capacity reached. Can't add any more keys`)
         return false
+    end
+
+    if typeof(value) == "table" then
+        value = GetTable(value)
     end
 
     if self:ContainsKey(key) then
@@ -159,7 +166,6 @@ function MapleMap.Add<K, V>(self: MapleMap<K, V>, key: K, value: V)
     end
     self._KVs[key] = value
     self._Metadata.Count += 1
-    self._Metadata.RootCount += 1
     return true
 end
 
@@ -174,8 +180,7 @@ function MapleMap.Set<K, V>(self: MapleMap<K, V>, key: K, value: V)
     end
 
     if typeof(value) == "table" then
-        warn(CommonWarns.TableNotAllowed)
-        return false
+        value = GetTable(value)
     end
 
     if not self:ContainsKey(key) then
@@ -441,6 +446,23 @@ function MapleMap.TrueEquals<K, V>(self: MapleMap<K, V>, other: MapleMap<unknown
     return DeepEquals(self, other)
 end
 
+function MapleMap.Recount<K, V>(self: MapleMap<K, V>)
+    -- TODO: Add recountign root count functionality
+    local count = 0
+    local countElements: (RawMap) -> ()
+    countElements = function(tab: RawMap)
+        for _, v: any in tab do
+            count += 1
+            if typeof(v) ~= "table" then
+                continue
+            end
+            countElements(v :: RawMap)
+        end
+    end
+    countElements(self._KVs)
+    self._Metadata.Count = count
+end
+
 -- LINQ methods
 function MapleMap.All<K, V>(self: MapleMap<K, V>, condition: LilacLINQ.ConditionFunc)
     return LilacLINQ.All(self._KVs, condition)
@@ -489,7 +511,7 @@ end
 
 -- Private methods
 function MapleMap._CountKeys<K, V>(self: MapleMap<K, V>)
-    local count = CountMap(self._KVs)
+    local count = GetCount(self._KVs)
     self._Metadata.Count = count
 end
 
