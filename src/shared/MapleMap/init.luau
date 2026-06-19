@@ -446,23 +446,6 @@ function MapleMap.TrueEquals<K, V>(self: MapleMap<K, V>, other: MapleMap<unknown
     return DeepEquals(self, other)
 end
 
-function MapleMap.Recount<K, V>(self: MapleMap<K, V>)
-    -- TODO: Add recountign root count functionality
-    local count = 0
-    local countElements: (RawMap) -> ()
-    countElements = function(tab: RawMap)
-        for _, v: any in tab do
-            count += 1
-            if typeof(v) ~= "table" then
-                continue
-            end
-            countElements(v :: RawMap)
-        end
-    end
-    countElements(self._KVs)
-    self._Metadata.Count = count
-end
-
 -- LINQ methods
 function MapleMap.All<K, V>(self: MapleMap<K, V>, condition: LilacLINQ.ConditionFunc)
     return LilacLINQ.All(self._KVs, condition)
