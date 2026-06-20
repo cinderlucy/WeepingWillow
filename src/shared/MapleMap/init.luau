@@ -7,6 +7,8 @@ Made for all
 local Settings = require("@self/Settings")
 local CommonWarns = require("@self/CommonWarns")
 local LilacLINQ = require("./LilacLINQ")
+local WeepingWillow = require("./WeepingWillow")
+local MemoryAddressLookup = require("./MemoryAddressLookup")
 
 export type RawMap = {[any]: any}
 export type _KVs<K, V> = {[K]: V}
@@ -55,16 +57,19 @@ MapleMap.__eq = function<K, V>(self: RawMap, other: RawMap)
         return map:TrueEquals(otherMap)
     end
 end
+local mapleMapMemoryAddress = tostring(MapleMap)
+MemoryAddressLookup[mapleMapMemoryAddress] = MapleMap
 
-export type MapleMapMetadata<K, V> = {
+export type MapleMapMetadata = {
     ["Count"]: number,
     ["Capacity"]: number,
     ["IsFixedCapacity"]: boolean,
     ["IsLocked"]: boolean,
     ["IsMutable"]: boolean,
     ["MapleMap"]: true,
+    ["Metatable"]: string,
     [string]: number | boolean
-}
+} & WeepingWillow.WeepingWillowBrand
 
 type MapleMapMethods<K, V> = {
     ["Add"]: (self: MapleMap<K, V>, key: K, value: V) -> boolean,
@@ -82,7 +87,7 @@ type MapleMapMethods<K, V> = {
 
 export type MapleMap<K, V> = setmetatable<{
     ["_KVs"]: _KVs<K, V>,
-    ["_Metadata"]: MapleMapMetadata<K, V>,
+    ["_Metadata"]: MapleMapMetadata,
     [string]: any -- Limiting to string to not strain the type checker
 } & LilacLINQ.LINQCompatible<MapleMap<K, V>> & MapleMapMethods<K, V>, typeof(MapleMap)>
 
@@ -112,6 +117,12 @@ local function GetTable<K, V>(kvs: _KVs<K, V>): _KVs<K, V>
             end
             new[k] = v
         end
+        if WeepingWillow.IsWeepingWillow(new) then
+            local addr = WeepingWillow.GetMetatableAddress(new)
+            if addr ~= nil then
+                setmetatable(new, MemoryAddressLookup[addr])
+            end
+        end
         return new
     end
     copied = loop(kvs)
@@ -131,15 +142,19 @@ function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacit
         end
     end
 
+    local metadata: MapleMapMetadata = {
+        Capacity = capacity or INFINITE_CAPACITY,
+        Count = count,
+        IsFixedCapacity = isFixedCapacity or false,
+        IsLocked = if isLocked ~= nil then isLocked else false,
+        IsMutable = if isMutable ~= nil then isMutable else true,
+        Metatable = mapleMapMemoryAddress,
+        MapleMap = true,
+        __brand = "WeepingWillow"
+    }
+
     rawset(self, "_KVs", mapToUse)
-    rawset(self, "_Metadata", {
-            Capacity = capacity or INFINITE_CAPACITY,
-            Count = count,
-            IsFixedCapacity = isFixedCapacity or false,
-            IsLocked = if isLocked ~= nil then isLocked else false,
-            IsMutable = if isMutable ~= nil then isMutable else true,
-            MapleMap = true
-        })
+    rawset(self, "_Metadata", metadata)
 
     return self
 end
@@ -323,9 +338,10 @@ end
 
 --[[ Returns a non-referenced copy of self ]]
 function MapleMap.DeepCopy<K, V>(self: MapleMap<K, V>)
+    -- TODO: Deep copy tables themeselves
     local deepCopy = {} :: MapleMap<K, V>
     deepCopy._KVs = {}
-    deepCopy._Metadata = {} :: MapleMapMetadata<K, V>
+    deepCopy._Metadata = {} :: MapleMapMetadata
 
     for k, v in self._KVs do
         deepCopy._KVs[k] = v
@@ -391,20 +407,51 @@ function MapleMap.Values<K, V>(self: MapleMap<K, V>): {V}
 end
 
 local function DeepEquals(first: RawMap, second: RawMap)
-    for k, v: any in first do
-        if typeof(v) == "table" and typeof(second[k]) == "table" then
-            local result = DeepEquals(v :: RawMap, second[k] :: RawMap)
+    local loop: (RawMap, RawMap) -> boolean
+    local passes = 0
+    local inifitePasses = -1
+    loop = function(tab0: RawMap, tab1: RawMap)
+        if Settings.MaxEqualityNestingCheck ~= inifitePasses and passes > Settings.MaxEqualityNestingCheck then
+            return false -- Return false to not create any false-positives
+        end
+
+        type Tables = {
+            ["First"]: RawMap,
+            ["Second"]: RawMap
+        }
+        local tablesToRecurse: {Tables} = {}
+
+        for k, v in tab0 do
+            if typeof(v) == "table" and typeof(tab1[k]) == "table" then
+                local count1 = GetCount(v)
+                local count2 = GetCount(tab1[k])
+                if count1 ~= count2 then
+                    return false
+                end
+
+                table.insert(tablesToRecurse, {First = v, Second = tab1[k]})
+                continue -- Skip because the next value check will return false if the tables don't have the same memory address
+            end
+
+            if tab1[k] ~= v then
+                return false
+            end
+        end
+
+        if #tablesToRecurse > 0 then
+            passes += 1
+        end
+
+        for _, v in tablesToRecurse do
+            local result = loop(v.First, v.Second)
             if result == false then
                 return false
             end
-            continue -- Skip because the next value check will return false if the tables don't have the same memory address
         end
 
-        if second[k] ~= v then
-            return false
-        end
+        return true
     end
-    return true
+    return loop(first, second)
 end
 
 --[[ Returns true only if top level _KVs are equal ]]
@@ -416,7 +463,7 @@ function MapleMap.Equals<K, V>(self: MapleMap<K, V>, other: MapleMap<unknown, un
         return false
     end
 
-    for k, v: any in self._KVs do
+    for k: K, v: V in self._KVs do
         if other._KVs[k] ~= v then
             return false
         end
