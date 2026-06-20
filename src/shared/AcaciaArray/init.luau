@@ -6,7 +6,9 @@ Made for all
 --!strict
 local CommonWarns = require("@self/CommonWarns")
 local Settings = require("@self/Settings")
+local MemoryAddressLookup = require(script.Parent.MemoryAddressLookup)
 local LilacLINQ = require("./LilacLINQ")
+local WeepingWillow = require("./WeepingWillow")
 
 export type RawArray<T> = {T}
 
@@ -40,14 +42,18 @@ AcaciaArray.__len = function<T>(self: {[string]: any})
     local array = self :: AcaciaArray<T>
     return array:Count()
 end
+local acaciaArrayMemoryAddr = tostring(AcaciaArray)
+MemoryAddressLookup[acaciaArrayMemoryAddr] = AcaciaArray
 
 export type AcaciaArrayMetadata = {
     ["Capacity"]: number,
     ["IsFixedCapacity"]: boolean,
     ["IsAcacia"]: boolean,
     ["IsLocked"]: boolean,
-    ["IsMutable"]: boolean
-}
+    ["IsMutable"]: boolean,
+    ["Metatable"]: string
+} & WeepingWillow.WeepingWillowBrand
+
 export type AcaciaArray<T> = setmetatable<{
     ["_Array"]: RawArray<T>,
     ["_Metadata"]: AcaciaArrayMetadata,
@@ -58,14 +64,19 @@ local INFINITE_CAPACITY = -1
 
 function AcaciaArray.New<T>(array: {T}?, capacity: number?, isFixedCapacity: boolean?, isLocked: boolean?, isMutable: boolean?): AcaciaArray<T>
     local self = setmetatable({}, AcaciaArray) :: AcaciaArray<T>
-    rawset(self, "_Array", array or {})
-    rawset(self, "_Metadata", {
+
+    local metadata: AcaciaArrayMetadata = {
         Capacity = capacity or INFINITE_CAPACITY,
         IsFixedCapacity = isFixedCapacity or false,
         IsAcacia = true,
-        IsLocked = isLocked or false,
-        IsMutable = isMutable or true
-    })
+        IsLocked = if isLocked ~= nil then isLocked else false,
+        IsMutable = if isMutable ~= nil then isMutable else true,
+        Metatable = acaciaArrayMemoryAddr,
+        __brand = "WeepingWillow"
+    }
+
+    rawset(self, "_Array", array or {})
+    rawset(self, "_Metadata", metadata)
     return self
 end
 
@@ -160,7 +171,7 @@ end
 
 -- Private methods
 function AcaciaArray._IsLockedOrImmutable<T>(self: AcaciaArray<T>)
-    return self._Metadata.IsLocked or not self._Metadata.IsMutable
+    return self:IsLocked() or not self:IsMutable()
 end
 
 function AcaciaArray._HasSufficientSpace<T>(self: AcaciaArray<T>, spaceNeeded: number)
