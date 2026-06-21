@@ -38,7 +38,7 @@ function LilacLINQ.Any(tab: Table, condition: ConditionFunc)
     return false
 end
 
---[[ Returns a new table that has k/vs where k/vs under _KVs meet the condition ]]
+--[[ Returns a new table that has k/v pairs where k/vs meet the condition ]]
 function LilacLINQ.Where(tab: Table, condition: ConditionFunc, isDictionary: boolean?): (Table, number)
     local dictionary: Table = {}
     local count = 0
