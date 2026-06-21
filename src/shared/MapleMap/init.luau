@@ -64,6 +64,10 @@ export type MapleMapMetadata = {
     ["IsLocked"]: boolean,
     ["IsMutable"]: boolean,
     ["MapleMap"]: true,
+    ["NestedTablesAreReferences"]: boolean, --[[
+    ^^^
+    Don't create any method to set this. After New is called, the map shouldn't potentially lie about what tables are and are not references
+    ]]
     [string]: number | boolean,
 } & WeepingWillow.WeepingWillowBrand
 
@@ -97,40 +101,7 @@ local function GetCount(map: RawMap)
     return count
 end
 
-local function GetTable<K, V>(kvs: _KVs<K, V>, ignoreSettings: boolean?): _KVs<K, V>
-    if Settings.NestedTablesAreReferences and not ignoreSettings then
-        return kvs
-    end
-
-    local copied: _KVs<K, V> = {}
-    local seen: RawMap = {}
-    local loop: (RawMap) -> RawMap
-    loop = function(tab: RawMap)
-        if seen[tab] then
-            return seen[tab]
-        end
-
-        local new: RawMap = {}
-        seen[tab] = new
-        for k: any, v: any in tab do
-            if typeof(v) == "table" then
-                new[k] = loop(v :: RawMap)
-                continue
-            end
-            new[k] = v
-        end
-
-        local metatable = getmetatable(tab)
-        if metatable then
-            setmetatable(new, metatable)
-        end
-        return new
-    end
-    copied = loop(kvs)
-    return copied
-end
-
-function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacity: boolean?, isLocked: boolean?, isMutable: boolean?): MapleMap<K, V>
+function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacity: boolean?, nestedTablesAreReferences: boolean?, isLocked: boolean?, isMutable: boolean?): MapleMap<K, V>
     local self = setmetatable({}, MapleMap) :: MapleMap<K, V>
     local mapToUse = _kvs or ({} :: {[K]: V})
     local count = 0
@@ -152,6 +123,7 @@ function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacit
         IsFixedCapacity = isFixedCapacity or false,
         IsLocked = if isLocked ~= nil then isLocked else false,
         IsMutable = if isMutable ~= nil then isMutable else true,
+        NestedTablesAreReferences = if nestedTablesAreReferences ~= nil then nestedTablesAreReferences else Settings.NestedTablesAreReferences,
         MapleMap = true,
         __brand = "WeepingWillow"
     }
@@ -175,7 +147,7 @@ function MapleMap.Add<K, V>(self: MapleMap<K, V>, key: K, value: V)
     end
 
     if typeof(value) == "table" then
-        value = GetTable(value)
+        value = self:_GetTable(value)
     end
 
     if self:ContainsKey(key) then
@@ -198,7 +170,7 @@ function MapleMap.Set<K, V>(self: MapleMap<K, V>, key: K, value: V)
     end
 
     if typeof(value) == "table" then
-        value = GetTable(value)
+        value = self:_GetTable(value)
     end
 
     if not self:ContainsKey(key) then
@@ -344,7 +316,7 @@ function MapleMap.DeepCopy<K, V>(self: MapleMap<K, V>)
         for k, v in tab do
             if typeof(v) == "table" then
                 local ignoreSettings = true
-                new[k] = GetTable(v, ignoreSettings)
+                new[k] = self:_GetTable(v, ignoreSettings)
                 continue
             end
             new[k] = v
@@ -534,6 +506,10 @@ function MapleMap.Capacity<K, V>(self: MapleMap<K, V>)
     return self._Metadata.Capacity
 end
 
+function MapleMap.NestedTablesAreReferences<K, V>(self: MapleMap<K, V>)
+    return self._Metadata.NestedTablesAreReferences
+end
+
 function MapleMap.IsLocked<K, V>(self: MapleMap<K, V>)
     return self._Metadata.IsLocked
 end
@@ -554,6 +530,39 @@ end
 
 function MapleMap._HasSufficientSpace<K, V>(self: MapleMap<K, V>, space: number)
     return self._Metadata.Capacity == INFINITE_CAPACITY or self._Metadata.Count + space <= self._Metadata.Capacity
+end
+
+function MapleMap._GetTable<K, V>(self: MapleMap<K, V>, kvs: _KVs<K, V>, ignoreSettings: boolean?): _KVs<K, V>
+    if self._Metadata.NestedTablesAreReferences and not ignoreSettings then
+        return kvs
+    end
+
+    local copied: _KVs<K, V> = {}
+    local seen: RawMap = {}
+    local loop: (RawMap) -> RawMap
+    loop = function(tab: RawMap)
+        if seen[tab] then
+            return seen[tab]
+        end
+
+        local new: RawMap = {}
+        seen[tab] = new
+        for k: any, v: any in tab do
+            if typeof(v) == "table" then
+                new[k] = loop(v :: RawMap)
+                continue
+            end
+            new[k] = v
+        end
+
+        local metatable = getmetatable(tab)
+        if metatable then
+            setmetatable(new, metatable)
+        end
+        return new
+    end
+    copied = loop(kvs)
+    return copied
 end
 
 return MapleMap
