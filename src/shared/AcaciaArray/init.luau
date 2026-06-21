@@ -6,7 +6,6 @@ Made for all
 --!strict
 local CommonWarns = require("@self/CommonWarns")
 local Settings = require("@self/Settings")
-local MemoryAddressLookup = require(script.Parent.MemoryAddressLookup)
 local LilacLINQ = require("./LilacLINQ")
 local WeepingWillow = require("./WeepingWillow")
 
@@ -42,8 +41,6 @@ AcaciaArray.__len = function<T>(self: {[string]: any})
     local array = self :: AcaciaArray<T>
     return array:Count()
 end
-local acaciaArrayMemoryAddr = tostring(AcaciaArray)
-MemoryAddressLookup[acaciaArrayMemoryAddr] = AcaciaArray
 
 export type AcaciaArrayMetadata = {
     ["Capacity"]: number,
@@ -51,7 +48,7 @@ export type AcaciaArrayMetadata = {
     ["IsAcacia"]: boolean,
     ["IsLocked"]: boolean,
     ["IsMutable"]: boolean,
-    ["Metatable"]: string
+    [string]: number | boolean,
 } & WeepingWillow.WeepingWillowBrand
 
 export type AcaciaArray<T> = setmetatable<{
@@ -71,7 +68,6 @@ function AcaciaArray.New<T>(array: {T}?, capacity: number?, isFixedCapacity: boo
         IsAcacia = true,
         IsLocked = if isLocked ~= nil then isLocked else false,
         IsMutable = if isMutable ~= nil then isMutable else true,
-        Metatable = acaciaArrayMemoryAddr,
         __brand = "WeepingWillow"
     }
 
