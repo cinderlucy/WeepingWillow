@@ -15,7 +15,7 @@ local Settings = {
     AllowNewIndexToUseRemove = true,
     DefaultEqualityCheck = "Shallow" :: EqualityLevels,
     MaxEqualityNestingCheck = 2, -- Set to -1 for the truest level of equality at the cost of performance on larger maps,
-    NestedTablesAreReferences = false, --[[
+    NestedTablesAreReferences = true, --[[
     ^^^
     Setting to false will deep copy the contents of nested tables before adding them, resulting in a performance hit
     Note that MapleMap:DeepCopy will never keep nested tables as references. This is by design. 
