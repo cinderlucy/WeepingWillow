@@ -122,7 +122,7 @@ function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacit
         Count = count,
         IsFixedCapacity = isFixedCapacity or false,
         IsLocked = if isLocked ~= nil then isLocked else false,
-        IsMutable = if isMutable ~= nil then isMutable else true,
+        IsMutable = true,
         NestedTablesAreReferences = if nestedTablesAreReferences ~= nil then nestedTablesAreReferences else Settings.NestedTablesAreReferences,
         MapleMap = true,
         __brand = "WeepingWillow"
@@ -130,6 +130,10 @@ function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacit
 
     rawset(self, "_KVs", mapToUse)
     rawset(self, "_Metadata", metadata)
+
+    if isMutable == false then
+        self:MakeImmutable()
+    end
 
     return self
 end
@@ -364,6 +368,7 @@ end
 
 function MapleMap.MakeImmutable<K, V>(self: MapleMap<K, V>)
     self._Metadata.IsMutable = false
+    table.freeze(self)
     table.freeze(self._KVs)
     table.freeze(self._Metadata)
 end
