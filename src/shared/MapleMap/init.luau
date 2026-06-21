@@ -285,9 +285,10 @@ function MapleMap.Join<K, V>(self: MapleMap<K, V>, other: MapleMap<K, V>)
         elements = raw
     end
 
+    local isDictionary = true
     local elementsToAdd, count = LilacLINQ.Where(elements, function(k: string, v: any)
         return self._KVs[k] == nil
-    end)
+    end, isDictionary)
 
     if not self:_HasSufficientSpace(count) then
         warn(`Can not join maps together. Insufficient space`)
@@ -295,6 +296,10 @@ function MapleMap.Join<K, V>(self: MapleMap<K, V>, other: MapleMap<K, V>)
     end
 
     for k, v: any in elementsToAdd do
+        if typeof(v) == "table" then
+            self._KVs[k] = self:_GetTable(v)
+            continue
+        end
         self._KVs[k] = v
     end
     self._Metadata.Count += count
@@ -325,7 +330,7 @@ function MapleMap.DeepCopy<K, V>(self: MapleMap<K, V>)
     end
     copied._KVs = deepCopy(self._KVs) :: _KVs<K, V>
     copied._Metadata = deepCopy(self._Metadata) :: MapleMapMetadata
-    return MapleMap.New(copied._KVs, copied._Metadata.Capacity, copied._Metadata.IsFixedCapacity, copied._Metadata.IsLocked, copied._Metadata.IsMutable)
+    return MapleMap.New(copied._KVs, copied._Metadata.Capacity, copied._Metadata.IsFixedCapacity, copied._Metadata.NestedTablesAreReferences, copied._Metadata.IsLocked, copied._Metadata.IsMutable)
 end
 
 function MapleMap.For<K, V>(self: MapleMap<K, V>, loop: (k: K, v: V) -> ())
