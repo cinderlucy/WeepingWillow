@@ -8,7 +8,6 @@ local Settings = require("@self/Settings")
 local CommonWarns = require("@self/CommonWarns")
 local LilacLINQ = require("./LilacLINQ")
 local WeepingWillow = require("./WeepingWillow")
-local MemoryAddressLookup = require("./MemoryAddressLookup")
 
 export type RawMap = {[any]: any}
 export type _KVs<K, V> = {[K]: V}
@@ -57,8 +56,6 @@ MapleMap.__eq = function<K, V>(self: RawMap, other: RawMap)
         return map:TrueEquals(otherMap)
     end
 end
-local mapleMapMemoryAddress = tostring(MapleMap)
-MemoryAddressLookup[mapleMapMemoryAddress] = MapleMap
 
 export type MapleMapMetadata = {
     ["Count"]: number,
@@ -67,8 +64,7 @@ export type MapleMapMetadata = {
     ["IsLocked"]: boolean,
     ["IsMutable"]: boolean,
     ["MapleMap"]: true,
-    ["Metatable"]: string,
-    [string]: number | boolean
+    [string]: number | boolean,
 } & WeepingWillow.WeepingWillowBrand
 
 type MapleMapMethods<K, V> = {
@@ -101,15 +97,21 @@ local function GetCount(map: RawMap)
     return count
 end
 
-local function GetTable<K, V>(kvs: _KVs<K, V>): _KVs<K, V>
-    if Settings.NestedTablesAreReferences then
+local function GetTable<K, V>(kvs: _KVs<K, V>, ignoreSettings: boolean?): _KVs<K, V>
+    if Settings.NestedTablesAreReferences and not ignoreSettings then
         return kvs
     end
 
     local copied: _KVs<K, V> = {}
+    local seen: RawMap = {}
     local loop: (RawMap) -> RawMap
     loop = function(tab: RawMap)
+        if seen[tab] then
+            return seen[tab]
+        end
+
         local new: RawMap = {}
+        seen[tab] = new
         for k: any, v: any in tab do
             if typeof(v) == "table" then
                 new[k] = loop(v :: RawMap)
@@ -117,11 +119,10 @@ local function GetTable<K, V>(kvs: _KVs<K, V>): _KVs<K, V>
             end
             new[k] = v
         end
-        if WeepingWillow.IsWeepingWillow(new) then
-            local addr = WeepingWillow.GetMetatableAddress(new)
-            if addr ~= nil then
-                setmetatable(new, MemoryAddressLookup[addr])
-            end
+
+        local metatable = getmetatable(tab)
+        if metatable then
+            setmetatable(new, metatable)
         end
         return new
     end
@@ -136,7 +137,10 @@ function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacit
 
     if _kvs then
         count = GetCount(_kvs)
-        if capacity and capacity < count and Settings.UNDEF_FallbackToInfinityIfCapacityLessThanCount then
+        if capacity 
+        and capacity ~= INFINITE_CAPACITY 
+        and capacity < count 
+        and Settings.UNDEF_FallbackToInfinityIfCapacityLessThanCount then
             warn(`Capacity can't be set to {capacity} because your map has {count} k/v pairs. Setting capacity to infinity instead`)
             capacity = INFINITE_CAPACITY
         end
@@ -148,7 +152,6 @@ function MapleMap.New<K, V>(_kvs: _KVs<K, V>?, capacity: number?, isFixedCapacit
         IsFixedCapacity = isFixedCapacity or false,
         IsLocked = if isLocked ~= nil then isLocked else false,
         IsMutable = if isMutable ~= nil then isMutable else true,
-        Metatable = mapleMapMemoryAddress,
         MapleMap = true,
         __brand = "WeepingWillow"
     }
@@ -260,7 +263,6 @@ function MapleMap.TrimExcess<K, V>(self: MapleMap<K, V>)
         warn(CommonWarns.LockedMap)
         return
     end
-
     if self._Metadata.IsFixedCapacity then
         warn(`Can't trim because map has a fixed capacity`)
         return
@@ -273,17 +275,14 @@ function MapleMap.Resize<K, V>(self: MapleMap<K, V>, newSize: number)
         warn(CommonWarns.LockedMap)
         return false
     end
-
     if self._Metadata.IsFixedCapacity then
         warn(`Can't resize because map has a fixed capacity`)
         return false
     end
-
     if self._Metadata.Count > newSize then
         warn(`New capacity can not be less than current count of elements`)
         return false
     end
-
     self._Metadata.Capacity = newSize
     return true
 end
@@ -338,19 +337,23 @@ end
 
 --[[ Returns a non-referenced copy of self ]]
 function MapleMap.DeepCopy<K, V>(self: MapleMap<K, V>)
-    -- TODO: Deep copy tables themeselves
-    local deepCopy = {} :: MapleMap<K, V>
-    deepCopy._KVs = {}
-    deepCopy._Metadata = {} :: MapleMapMetadata
-
-    for k, v in self._KVs do
-        deepCopy._KVs[k] = v
+    local copied = {} :: MapleMap<K, V>
+    local deepCopy: (RawMap) -> RawMap
+    deepCopy = function(tab: RawMap)
+        local new: RawMap = {}
+        for k, v in tab do
+            if typeof(v) == "table" then
+                local ignoreSettings = true
+                new[k] = GetTable(v, ignoreSettings)
+                continue
+            end
+            new[k] = v
+        end
+        return new
     end
-    for k, v in self._Metadata do
-        deepCopy._Metadata[k] = v
-    end
-
-    return MapleMap.New(deepCopy._KVs, deepCopy._Metadata.Capacity, deepCopy._Metadata.IsFixedCapacity, deepCopy._Metadata.IsLocked, deepCopy._Metadata.IsMutable)
+    copied._KVs = deepCopy(self._KVs) :: _KVs<K, V>
+    copied._Metadata = deepCopy(self._Metadata) :: MapleMapMetadata
+    return MapleMap.New(copied._KVs, copied._Metadata.Capacity, copied._Metadata.IsFixedCapacity, copied._Metadata.IsLocked, copied._Metadata.IsMutable)
 end
 
 function MapleMap.For<K, V>(self: MapleMap<K, V>, loop: (k: K, v: V) -> ())
